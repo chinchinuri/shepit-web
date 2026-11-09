@@ -124,6 +124,8 @@ onWorker((m) => {
     fill.style.width = '100%';
     text.textContent = m.text;
     setEngineState('loading', m.text);
+  } else if (m.type === 'model-warning') {
+    showError(m.text);
   } else if (m.type === 'model-ready') {
     modelReady = true;
     setEngineState('ready', 'Модель готова');
@@ -376,6 +378,8 @@ async function startRecording() {
     showError('Немає доступу до мікрофона. Дозвольте його в адресному рядку браузера й спробуйте ще раз.');
     return;
   }
+  el.wave.width = Math.max(100, Math.round(el.wave.clientWidth * (window.devicePixelRatio || 1)));
+  el.wave.height = Math.round(48 * (window.devicePixelRatio || 1));
   const ctx = new AudioContext();
   if (ctx.state === 'suspended') await ctx.resume();
   await ctx.audioWorklet.addModule('js/capture-worklet.js');
@@ -506,6 +510,8 @@ let fileJob = null;
 
 async function decodeTo16k(file) {
   const data = await file.arrayBuffer();
+  el.wave.width = Math.max(100, Math.round(el.wave.clientWidth * (window.devicePixelRatio || 1)));
+  el.wave.height = Math.round(48 * (window.devicePixelRatio || 1));
   const ctx = new AudioContext();
   let decoded;
   try {

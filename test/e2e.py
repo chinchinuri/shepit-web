@@ -24,13 +24,19 @@ server = http.server.ThreadingHTTPServer(("127.0.0.1", 8765), handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(args=[
-        "--use-fake-ui-for-media-stream",
-        "--use-fake-device-for-media-stream",
-        f"--use-file-for-fake-audio-capture={wav}",
-        "--autoplay-policy=no-user-gesture-required",
-    ])
-    ctx = browser.new_context(viewport={"width": 1280, "height": 860}, permissions=["microphone"])
+    # A persistent profile, like a real user's browser (storage quota, cache).
+    ctx = p.chromium.launch_persistent_context(
+        "profile",
+        args=[
+            "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream",
+            f"--use-file-for-fake-audio-capture={wav}",
+            "--autoplay-policy=no-user-gesture-required",
+        ],
+        viewport={"width": 1280, "height": 860},
+        permissions=["microphone"],
+    )
+    browser = ctx
     page = ctx.new_page()
     page.on("console", lambda m: print(f"[console.{m.type}] {m.text}") if m.type in ("error", "warning") else None)
     page.on("pageerror", lambda e: print(f"[pageerror] {e}"))
@@ -43,8 +49,17 @@ with sync_playwright() as p:
     page.click("#load-model")
     page.wait_for_timeout(4000)
     page.screenshot(path=shots / "2-downloading.png")
-    page.wait_for_selector('#engine-state[data-state="ready"]', timeout=15 * 60 * 1000)
+    page.wait_for_function(
+        """() => document.querySelector('#engine-state').dataset.state === 'ready'
+               || (!document.querySelector('#error').hidden && !document.querySelector('#load-model').disabled)""",
+        timeout=15 * 60 * 1000,
+    )
+    if page.get_attribute("#engine-state", "data-state") != "ready":
+        page.screenshot(path=shots / "3-error.png")
+        raise SystemExit("model failed to load: " + page.inner_text("#error"))
     print(f"model ready after {time.time() - t0:.0f} s")
+    print("storage:", page.evaluate("navigator.storage.estimate().then(e => JSON.stringify(e))"))
+    print("notice:", page.inner_text("#error") if page.is_visible("#error") else "-")
     page.screenshot(path=shots / "3-ready.png")
 
     # Live recording from the fake microphone.

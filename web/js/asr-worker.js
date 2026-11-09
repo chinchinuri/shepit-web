@@ -32,30 +32,51 @@ function post(msg, transfer) {
   self.postMessage(msg, transfer || []);
 }
 
-/** Downloads a file once into Cache Storage (with progress), then returns it as a Blob. */
+let cacheWarned = false;
+
+/** Streams a response body while reporting bytes. */
+function counting(body, onBytes, total) {
+  let done = 0;
+  return body.pipeThrough(new TransformStream({
+    transform(chunk, ctrl) {
+      done += chunk.length;
+      onBytes(done, total);
+      ctrl.enqueue(chunk);
+    },
+  }));
+}
+
+/**
+ * Downloads a file once into Cache Storage (with progress), then returns it as a
+ * Blob. If the browser refuses to store it (no space, private window), the file
+ * is kept in memory for this session only.
+ */
 async function cachedBlob(url, onBytes) {
   const cache = await caches.open(MODEL_CACHE);
-  let resp = await cache.match(url);
-  if (!resp) {
-    const net = await fetch(url);
-    if (!net.ok) throw new Error(`Не вдалося завантажити ${url.split('/').pop()}: HTTP ${net.status}`);
-    const total = Number(net.headers.get('content-length')) || 0;
-    let done = 0;
-    // Count bytes on the way to the cache: nothing is held in memory.
-    const counted = net.body.pipeThrough(new TransformStream({
-      transform(chunk, ctrl) {
-        done += chunk.length;
-        onBytes(done, total);
-        ctrl.enqueue(chunk);
-      },
-    }));
-    await cache.put(url, new Response(counted, { headers: { 'content-length': String(total) } }));
-    resp = await cache.match(url);
-  } else {
-    const size = Number(resp.headers.get('content-length')) || 0;
+  const hit = await cache.match(url);
+  if (hit) {
+    const size = Number(hit.headers.get('content-length')) || 0;
     onBytes(size, size);
+    return hit.blob();
   }
-  return resp.blob();
+  const net = await fetch(url);
+  if (!net.ok) throw new Error(`Не вдалося завантажити ${url.split('/').pop()}: HTTP ${net.status}`);
+  const total = Number(net.headers.get('content-length')) || 0;
+  try {
+    await cache.put(url, new Response(counting(net.body, onBytes, total), { headers: { 'content-length': String(total) } }));
+    const stored = await cache.match(url);
+    if (stored) return stored.blob();
+  } catch (err) {
+    console.warn('Cache Storage refused the model file:', err);
+    await cache.delete(url).catch(() => {});
+  }
+  if (!cacheWarned) {
+    cacheWarned = true;
+    post({ type: 'model-warning', text: 'Браузер не дозволив зберегти модель (замало місця або приватне вікно). Вона працюватиме до закриття вкладки й завантажиться знову наступного разу.' });
+  }
+  const again = await fetch(url);
+  if (!again.ok) throw new Error(`Не вдалося завантажити ${url.split('/').pop()}: HTTP ${again.status}`);
+  return new Response(counting(again.body, onBytes, total)).blob();
 }
 
 async function loadModel(baseUrl) {
