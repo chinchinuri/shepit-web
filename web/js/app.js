@@ -495,6 +495,7 @@ async function stopRecording() {
   el.record.setAttribute('aria-label', 'Почати запис');
   el.pause.textContent = 'Пауза';
   el.timer.textContent = '0:00';
+  el.wave.getContext('2d').clearRect(0, 0, el.wave.width, el.wave.height);
   el.pace.textContent = '';
   el.fileInput.disabled = false;
   await openRecording(current.id);
