@@ -1,0 +1,10 @@
+{
+  "name": "Шепіт — диктофон і розпізнавання мовлення",
+  "short_name": "Шепіт",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef1f4",
+  "theme_color": "#1c2430",
+  "lang": "uk",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

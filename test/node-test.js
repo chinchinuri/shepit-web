@@ -28,6 +28,20 @@ function readWav(file) {
   throw new Error('no data chunk');
 }
 
+// Linear resampling to 16 kHz, as the browser does for imported files.
+function to16k({ samples, sr }) {
+  if (sr === 16000) return samples;
+  const step = sr / 16000;
+  const out = new Float32Array(Math.floor(samples.length / step));
+  for (let i = 0; i < out.length; i++) {
+    const p = i * step;
+    const j = Math.floor(p);
+    const b = samples[Math.min(j + 1, samples.length - 1)];
+    out[i] = samples[j] + (b - samples[j]) * (p - j);
+  }
+  return out;
+}
+
 globalThis.Module = {
   locateFile: (p) => path.join(engineDir, p),
   print: () => {},
@@ -60,8 +74,7 @@ vm.runInThisContext(fs.readFileSync(path.resolve(__dirname, '../web/js/recognize
   let totalWall = 0;
   let ukText = '';
   for (const lang of ['de', 'es', 'fr', 'ja', 'uk']) {
-    const { samples, sr } = readWav(path.join(modelDir, 'test_wavs', `${lang}.wav`));
-    if (sr !== 16000) throw new Error(`${lang}.wav is ${sr} Hz`);
+    const samples = to16k(readWav(path.join(modelDir, 'test_wavs', `${lang}.wav`)));
     t0 = Date.now();
     const finals = [];
     // Same block size as the microphone path (~64 ms) to exercise streaming.
@@ -85,7 +98,7 @@ vm.runInThisContext(fs.readFileSync(path.resolve(__dirname, '../web/js/recognize
 
   // Fixed language and switching mid-stream.
   t.setLanguage('uk');
-  const { samples } = readWav(path.join(modelDir, 'test_wavs', 'uk.wav'));
+  const samples = to16k(readWav(path.join(modelDir, 'test_wavs', 'uk.wav')));
   for (let i = 0; i < samples.length; i += 8000) t.accept(samples.subarray(i, i + 8000));
   const f = t.finish();
   console.log('uk fixed:', f && f.text);

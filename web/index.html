@@ -1,1 +1,93 @@
-<!doctype html><meta charset="utf-8"><title>Шепіт</title><p>__BUILD__</p>
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Шепіт — диктофон і розпізнавання мовлення</title>
+  <meta name="description" content="Запис і розпізнавання мовлення прямо в браузері. Аудіо не залишає комп'ютер.">
+  <meta name="theme-color" content="#1c2430">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css?v=__BUILD__">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="./" aria-label="Шепіт">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="11" y="3" width="10" height="17" rx="5"/><path d="M6 14a10 10 0 0 0 20 0M16 24v5M11 29h10"/></svg>
+      <span>Шепіт</span>
+    </a>
+    <label class="lang">
+      <span>Мова</span>
+      <select id="language"></select>
+    </label>
+    <span id="engine-state" class="engine-state" data-state="off">Модель не завантажена</span>
+  </header>
+
+  <div class="layout">
+    <aside class="archive" aria-label="Записи">
+      <div class="archive-head">
+        <h2>Записи</h2>
+        <label class="import">
+          <input id="file-input" type="file" accept="audio/*,video/*">
+          <span>Розпізнати файл</span>
+        </label>
+      </div>
+      <ol id="recordings" class="recordings"></ol>
+      <p id="recordings-empty" class="hint">Тут з'являться ваші записи. Вони зберігаються лише в цьому браузері.</p>
+    </aside>
+
+    <main class="desk">
+      <section id="setup" class="setup" hidden>
+        <h1>Розпізнавання мовлення без інтернету</h1>
+        <p>Шепіт записує й розпізнає мовлення прямо в браузері моделлю NVIDIA Nemotron 3.5. Аудіо й текст не залишають цей комп'ютер.</p>
+        <p>Для роботи потрібна модель розміром 680 МБ. Вона завантажується один раз і далі береться з кешу браузера.</p>
+        <button id="load-model" class="primary" type="button">Завантажити модель (680 МБ)</button>
+        <div id="model-progress" class="progress" hidden>
+          <div class="track"><div class="fill"></div></div>
+          <span class="progress-text"></span>
+        </div>
+        <p class="hint">Потрібен комп'ютер із щонайменше 8 ГБ оперативної пам'яті та свіжий Chrome, Edge або Firefox.</p>
+      </section>
+
+      <section id="recorder" class="recorder" hidden>
+        <button id="record" class="record" type="button" aria-label="Почати запис"><span></span></button>
+        <div class="meter">
+          <output id="timer" class="timer">0:00</output>
+          <canvas id="wave" width="600" height="48" aria-hidden="true"></canvas>
+        </div>
+        <div class="controls">
+          <button id="pause" type="button" disabled>Пауза</button>
+          <button id="stop" type="button" disabled>Зупинити і зберегти</button>
+        </div>
+        <p id="pace" class="pace" aria-live="polite"></p>
+      </section>
+
+      <article id="sheet" class="sheet" hidden>
+        <header class="sheet-head">
+          <h1 id="sheet-title" contenteditable="true" spellcheck="false"></h1>
+          <p id="sheet-meta" class="meta"></p>
+          <div id="file-progress" class="progress" hidden>
+            <div class="track"><div class="fill"></div></div>
+            <span class="progress-text"></span>
+            <button id="cancel-file" type="button">Зупинити</button>
+          </div>
+          <audio id="player" controls hidden></audio>
+          <div id="sheet-actions" class="sheet-actions" hidden>
+            <button data-export="txt" type="button">Завантажити TXT</button>
+            <button data-export="srt" type="button">Завантажити SRT</button>
+            <button data-export="copy" type="button">Копіювати текст</button>
+            <button data-export="audio" type="button">Завантажити аудіо</button>
+            <button id="delete" class="danger" type="button">Видалити запис</button>
+          </div>
+        </header>
+        <ol id="lines" class="lines"></ol>
+        <p id="partial" class="partial" aria-live="polite"></p>
+      </article>
+
+      <p id="error" class="error" role="alert" hidden></p>
+    </main>
+  </div>
+
+  <script src="js/app.js?v=__BUILD__" type="module"></script>
+</body>
+</html>
