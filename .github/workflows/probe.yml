@@ -1,0 +1,21 @@
+name: Probe model hosting
+on: [push, workflow_dispatch]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hugging Face mirrors with CORS
+        run: |
+          N=sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11
+          for repo in csukuangfj/$N k2-fsa/$N csukuangfj2/$N; do
+            for f in tokens.txt encoder.int8.onnx; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -I -L "https://huggingface.co/$repo/resolve/main/$f")
+              echo "$repo/$f -> $code"
+            done
+          done
+          curl -s "https://huggingface.co/api/models?search=nemotron-3.5-asr&limit=50" | python3 -c "import json,sys;[print(m['id']) for m in json.load(sys.stdin)]"
+          curl -sI -H "Origin: https://example.github.io" "https://huggingface.co/csukuangfj/$N/resolve/main/tokens.txt" | grep -i "access-control\|location\|HTTP" || true
+      - name: Package layout
+        run: |
+          curl -fsL -o n.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11.tar.bz2
+          tar tjvf n.tar.bz2
