@@ -1,0 +1,81 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  MODEL_BASE: https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        id: engine-cache
+        with:
+          path: web/engine
+          key: engine-${{ hashFiles('wasm/CMakeLists.txt', 'scripts/build-wasm.sh') }}-v2.0.1-emsdk4.0.23
+
+      - uses: mymindstorm/setup-emsdk@v14
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        with:
+          version: 4.0.23
+
+      - name: Build WebAssembly engine
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        run: ./scripts/build-wasm.sh
+
+      - name: Download model (same files and host the browser uses)
+        run: |
+          mkdir -p model/test_wavs
+          for f in tokens.txt decoder.int8.onnx joiner.int8.onnx encoder.int8.onnx; do
+            curl -fsSL -o "model/$f" "$MODEL_BASE/$f"
+          done
+          for w in de es fr ja uk; do
+            curl -fsSL -o "model/test_wavs/$w.wav" "$MODEL_BASE/test_wavs/$w.wav"
+          done
+          ls -la model model/test_wavs
+          echo "CORS header from the model host:"
+          curl -sIL -H "Origin: https://chinchinuri.github.io" "$MODEL_BASE/tokens.txt" | grep -i "access-control-allow-origin"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run engine test in Node
+        run: node test/node-test.js model
+
+      - name: Stamp version
+        run: |
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" web/sw.js web/index.html
+          ls -la web web/engine
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
